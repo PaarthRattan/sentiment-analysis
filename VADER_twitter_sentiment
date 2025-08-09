@@ -6,8 +6,7 @@ This module implements VADER (Valence Aware Dictionary for Sentiment Reasoning)
 sentiment analysis on Twitter data, providing comprehensive evaluation metrics
 for comparison with transformer-based models like RoBERTa.
 
-Author: [Your Name]
-Date: [Current Date]
+Author: Paarth Rattan
 """
 
 import pandas as pd
@@ -250,4 +249,171 @@ class TwitterSentimentVADER:
         """Plot sentiment distribution using your preferred style."""
         plt.figure(figsize=(8, 5))
         sns.countplot(data=self.data, x='sentiment', palette='Set2')
-        plt.title('Count of Reviews by
+        plt.title('Count of Reviews by Sentiment (Twitter tweets)')
+        plt.xlabel('Sentiment')
+        plt.ylabel('Count')
+
+        # Annotate the bars with counts
+        for p in plt.gca().patches:
+            plt.gca().annotate(f"{int(p.get_height())}", 
+                             (p.get_x() + p.get_width() / 2., p.get_height()), 
+                             ha='center', va='bottom')
+        plt.show()
+    
+    def plot_sentiment_comparison(self):
+        """Plot comparison between true and predicted sentiments."""
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+        
+        # True sentiment distribution
+        true_counts = self.data['sentiment'].value_counts()
+        bars1 = ax1.bar(true_counts.index, true_counts.values, color=['#ff6b6b', '#feca57', '#48dbfb'], alpha=0.8)
+        ax1.set_title('True Sentiment Distribution')
+        ax1.set_xlabel('Sentiment')
+        ax1.set_ylabel('Count')
+        
+        # Add count labels
+        for bar in bars1:
+            height = bar.get_height()
+            ax1.annotate(f'{int(height)}', xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3), textcoords="offset points", ha='center', va='bottom')
+        
+        # VADER predicted sentiment distribution
+        vader_mapping = {-1: 'negative', 0: 'neutral', 1: 'positive'}
+        vader_labels = [vader_mapping[pred] for pred in self.data['vader_sentiment']]
+        vader_counts = pd.Series(vader_labels).value_counts()
+        
+        bars2 = ax2.bar(vader_counts.index, vader_counts.values, color=['#ff6b6b', '#feca57', '#48dbfb'], alpha=0.8)
+        ax2.set_title('VADER Predicted Sentiment Distribution')
+        ax2.set_xlabel('Sentiment')
+        ax2.set_ylabel('Count')
+        
+        # Add count labels
+        for bar in bars2:
+            height = bar.get_height()
+            ax2.annotate(f'{int(height)}', xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3), textcoords="offset points", ha='center', va='bottom')
+        
+        plt.tight_layout()
+        plt.show()
+    
+    def plot_word_length_distribution(self):
+        """Plot word length distribution using your preferred style."""
+        plt.figure(figsize=(7,5))
+        ax = sns.countplot(x='text_len', data=self.data[self.data['text_len']<10], palette='mako')
+        plt.title('Twitter tweets with less than 10 words')
+        plt.yticks([])
+        ax.bar_label(ax.containers[0])
+        plt.ylabel('count')
+        plt.xlabel('Word Count')
+        plt.show()
+    
+    def plot_confusion_matrix(self):
+        """Plot confusion matrix with your preferred style."""
+        y_true = self.data['true_sentiment_num']
+        y_pred = self.data['vader_sentiment']
+        
+        cm = confusion_matrix(y_true, y_pred)
+        class_names = ['Negative', 'Neutral', 'Positive']
+        
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+        
+        # Raw counts
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                   xticklabels=class_names, yticklabels=class_names, ax=ax1)
+        ax1.set_title('Confusion Matrix - Raw Counts')
+        ax1.set_xlabel('Predicted')
+        ax1.set_ylabel('Actual')
+        
+        # Normalized
+        cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        sns.heatmap(cm_norm, annot=True, fmt='.3f', cmap='Blues',
+                   xticklabels=class_names, yticklabels=class_names, ax=ax2)
+        ax2.set_title('Confusion Matrix - Normalized')
+        ax2.set_xlabel('Predicted')
+        ax2.set_ylabel('Actual')
+        
+        plt.tight_layout()
+        plt.show()
+    
+    def plot_accuracy_by_category(self):
+        """Plot accuracy by sentiment category using your preferred style."""
+        y_true = self.data['true_sentiment_num']
+        y_pred = self.data['vader_sentiment']
+        
+        # Calculate per-class accuracy
+        class_names = ['negative', 'neutral', 'positive']
+        class_labels = [-1, 0, 1]
+        accuracies = []
+        
+        for label in class_labels:
+            y_true_binary = (y_true == label).astype(int)
+            y_pred_binary = (y_pred == label).astype(int)
+            accuracy = accuracy_score(y_true_binary, y_pred_binary)
+            accuracies.append(accuracy)
+        
+        # Create bar plot
+        plt.figure(figsize=(8, 6))
+        bars = plt.bar(class_names, accuracies, color=['red', 'blue', 'green'], alpha=0.8)
+        plt.xlabel('Sentiment Category')
+        plt.ylabel('Accuracy')
+        plt.title('VADER Accuracy by Sentiment Category')
+        plt.ylim(0, 1)
+        
+        # Add value labels on bars
+        for bar, accuracy in zip(bars, accuracies):
+            plt.text(bar.get_x() + bar.get_width()/2, accuracy + 0.01, 
+                    f'{accuracy:.3f}', ha='center', va='bottom')
+        
+        plt.show()
+
+def main(data_file=None, sample_size=5000):
+    """Main function to run VADER Twitter sentiment analysis."""
+    # Get dataset filepath
+    if data_file is None:
+        data_file = input("Enter path to your Twitter dataset CSV file (default: 'Tweets.csv'): ").strip()
+        if not data_file:
+            data_file = 'Tweets.csv'
+    
+    print(f"Using dataset: {data_file}")
+    
+    # Initialize VADER analyzer
+    vader_analyzer = TwitterSentimentVADER()
+    
+    # Load and preprocess data
+    data = vader_analyzer.load_and_preprocess_data(data_file, sample_size)
+    if data is None:
+        print("Failed to load data. Exiting.")
+        return
+    
+    # Map true labels
+    vader_analyzer.map_true_labels()
+    
+    # Analyze sentiments
+    vader_analyzer.analyze_sentiments()
+    
+    # Generate visualizations
+    create_visualizations = input("Generate visualizations? (y/n): ").lower() == 'y'
+    if create_visualizations:
+        print("\nGenerating visualizations...")
+        vader_analyzer.plot_sentiment_distribution()
+        vader_analyzer.plot_word_length_distribution()
+        vader_analyzer.plot_sentiment_comparison()
+        vader_analyzer.plot_confusion_matrix()
+        vader_analyzer.plot_accuracy_by_category()
+    
+    # Print evaluation results
+    print("\nEvaluating VADER performance on Twitter data...")
+    vader_analyzer.print_evaluation_results()
+    
+    return vader_analyzer
+
+if __name__ == "__main__":
+    import sys
+    
+    # Check for command line arguments
+    if len(sys.argv) > 1:
+        data_file = sys.argv[1]
+        sample_size = int(sys.argv[2]) if len(sys.argv) > 2 else 5000
+        main(data_file, sample_size)
+    else:
+        main()
