@@ -301,4 +301,74 @@ def plot_text_length_distribution(df, text_col='text_cleaned'):
     df_short = df[df['text_len'] < 10]
     ax = sns.countplot(x='text_len', data=df_short, palette='mako')
     plt.title('Training tweets with less than 10 words')
-    plt.
+    plt.yticks([])
+    ax.bar_label(ax.containers[0])
+    plt.ylabel('count')
+    plt.xlabel('Word Count')
+    plt.show()
+
+def main(data_file=None):
+    """Main function to run the Twitter sentiment analysis pipeline."""
+    try:
+        # Get dataset filepath
+        if data_file is None:
+            data_file = input("Enter path to your Twitter dataset CSV file (default: 'Tweets.csv'): ").strip()
+            if not data_file:
+                data_file = 'Tweets.csv'
+        
+        print(f"Using dataset: {data_file}")
+        print("Loading and preprocessing Twitter data...")
+        (X_train, y_train), (X_val, y_val), ohe = load_data(data_file)
+        
+        # Optional: Generate data visualizations
+        create_visualizations = input("Generate data visualizations? (y/n): ").lower() == 'y'
+        if create_visualizations:
+            # Load original data for visualization
+            df = pd.read_csv(data_file, encoding='ISO-8859-1')
+            df = df.drop([col for col in ['textID', 'selected_text'] if col in df.columns], axis=1)
+            df = df.drop_duplicates(subset='text')
+            df = preprocess_text(df, text_col='text')
+            
+            print("\nGenerating data visualizations...")
+            plot_sentiment_distribution(df)
+            plot_text_length_distribution(df)
+        
+        # Tokenize data
+        train_ids, train_masks = tokenize_data(X_train)
+        val_ids, val_masks = tokenize_data(X_val)
+
+        print(f"\nTraining samples: {len(X_train):,}")
+        print(f"Validation samples: {len(X_val):,}")
+
+        # Build and train model
+        model = build_model()
+        print("\nTraining model...")
+        history = model.fit(
+            [train_ids, train_masks], y_train, 
+            validation_data=([val_ids, val_masks], y_val),
+            epochs=4, batch_size=30, verbose=1
+        )
+
+        # Save model weights
+        model.save_weights('RobertaWeightsTwitterSentiment.h5')
+        print("Model weights saved!")
+
+        # Evaluate model
+        print("\nEvaluating model...")
+        evaluate_model(model, X_val, y_val)
+        
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        print("Please make sure your Twitter CSV file is in the current directory.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+if __name__ == "__main__":
+    import sys
+    
+    # Check for command line arguments
+    if len(sys.argv) > 1:
+        data_file = sys.argv[1]
+        main(data_file)
+    else:
+        main()
